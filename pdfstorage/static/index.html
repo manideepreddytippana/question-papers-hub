@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Question Paper Hub</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container">
+        <header>
+            <h1>Question Paper Hub</h1>
+            <p>Upload and find question papers from your university.</p>
+        </header>
+
+        <main>
+            <div class="upload-section">
+                <h2>Upload a Question Paper</h2>
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="subject">Subject</label>
+                            <select id="subject" name="subject" required>
+                             <option value="" disabled selected>Select Subject</option>
+                            </select>
+
+                        </div>
+                        <div class="form-group">
+                            <label for="branch">Branch</label>
+                            <select id="branch" name="branch" required>
+                                <option value="" disabled selected>Select Branch</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="regulation">Regulation</label>
+                            <select id="regulation" name="regulation" required>
+                                <option value="" disabled selected>Select Regulation</option>
+                            </select>
+                        </div>
+                        <div class="form-group file-input-group">
+                            <label for="file">Question Paper File</label>
+                            <input type="file" id="file" name="file" accept=".pdf" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-upload">Upload Paper</button>
+                </form>
+                <div id="message-box" class="message-box" style="display: none;"></div>
+            </div>
+
+            <div class="papers-section">
+                <h2>Available Question Papers</h2>
+                
+                <div class="actions-toolbar">
+                    <button id="analyze-selected-btn" class="btn-analyze" disabled>
+                        Analyze Selected Files (<span id="selected-count">0</span>)
+                    </button>
+                </div>
+
+                <div class="filter-section">
+                     <input type="text" id="search-input" placeholder="Search by subject, branch...">
+                </div>
+                <div id="papers-grid" class="papers-grid">
+                    </div>
+            </div>
+        </main>
+    </div>
+    
+    <div id="analysis-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h2 id="modal-title">Analysis Result</h2>
+            <div id="modal-body">
+                </div>
+            <button id="close-modal-btn" class="btn-upload">Close</button>
+        </div>
+    </div>
+
+
+    <script src="script.js"></script>
+</body>
+</html>
