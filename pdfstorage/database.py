@@ -40,7 +40,6 @@ def init_db():
     print("Initializing database...")
     try:
         with open('schema.sql', 'r') as f:
-            # Psycopg2 can execute a whole multi-statement file
             cursor.execute(f.read())
         conn.commit()
         print("Database initialized successfully.")
