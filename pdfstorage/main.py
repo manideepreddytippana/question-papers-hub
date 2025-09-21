@@ -30,7 +30,7 @@ async def get_summary_from_gemini(text):
     chatHistory = [{"role": "user", "parts": [{"text": text}]}]
     payload = {"contents": chatHistory}
     # IMPORTANT: Replace with your actual API Key
-    apiKey = "AIzaSyCfLGAHzesL8sln7qgz_dvQMvGo6tgD5OE"
+    apiKey = os.getenv("API_KEY")
     apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={apiKey}"
     
     try:
