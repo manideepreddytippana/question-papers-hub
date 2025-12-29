@@ -1,23 +1,10 @@
-# init_db.py
-import database
+import database as db
 
-def initialize():
-    """
-    A dedicated function to initialize the database.
-    """
-    print("This script will initialize the database defined in database.py.")
-    print("WARNING: This will drop existing tables and delete all data.")
-    
-    confirm = input("Are you sure you want to continue? (y/n): ")
-
-    if confirm.lower() == 'y':
-        try:
-            database.init_db()
-            print("\nDatabase initialization complete.")
-        except Exception as e:
-            print(f"\nAn error occurred during initialization: {e}")
-    else:
-        print("\nInitialization cancelled.")
+def initialize_database():
+    """Initialize the database with schema and sample data."""
+    print("Starting database initialization...")
+    db.init_db()
+    print("Database initialization complete!")
 
 if __name__ == '__main__':
-    initialize()
+    initialize_database()

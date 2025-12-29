@@ -1,11 +1,10 @@
--- schema.sql
 DROP TABLE IF EXISTS papers;
 DROP TABLE IF EXISTS subjects;
 DROP TABLE IF EXISTS branches;
 DROP TABLE IF EXISTS regulations;
 
 CREATE TABLE papers (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     subject VARCHAR(255) NOT NULL,
     branch VARCHAR(255) NOT NULL,
     regulation VARCHAR(255) NOT NULL,
@@ -14,21 +13,21 @@ CREATE TABLE papers (
 );
 
 CREATE TABLE subjects (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL
 );
 
 CREATE TABLE branches (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL
 );
 
 CREATE TABLE regulations (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL
 );
 
--- Insert some sample data for the dropdowns
+-- Insert sample data for the dropdowns
 INSERT INTO subjects (name) VALUES
 ('Mathematics-I'),
 ('Physics'),
