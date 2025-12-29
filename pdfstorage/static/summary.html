@@ -22,6 +22,10 @@
             const contentDiv = document.getElementById('summary-content');
             const loadingDiv = document.getElementById('loading-indicator');
             const filename = window.location.pathname.split('/').pop();
+            function formatBold(text) {
+                return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                }
+
 
             try {
                 const response = await fetch(`/api/analyze/${filename}`);
@@ -30,10 +34,75 @@
                 loadingDiv.style.display = 'none';
 
                 if (response.ok) {
+                    console.log(data.summary);
+                    const lines = data.summary.split('\n');
+
+                    let html = '';
+                    let inList = false;
+
+                    lines.forEach(line => {
+                    line = line.trim();
+
+                    // Horizontal line
+                    if (line === '---') {
+                        if (inList) {
+                        html += '</ul>';
+                        inList = false;
+                        }
+                        html += '<hr>';
+                        return;
+                    }
+
+                    // ### Heading
+                    if (line.startsWith('### ')) {
+                        if (inList) {
+                        html += '</ul>';
+                        inList = false;
+                        }
+                        html += `<h2>${line.replace('### ', '')}</h2>`;
+                        return;
+                    }
+
+                    // **Bold Heading**
+                    if (line.startsWith('**') && line.endsWith('**')) {
+                        if (inList) {
+                        html += '</ul>';
+                        inList = false;
+                        }
+                        html += `<h3>${formatBold(line.replace(/\*\*/g, ''))}</h3>`;
+                        return;
+                    }
+
+                    // Bullet points (* or -)
+                    if (line.startsWith('*') || line.startsWith('-')) {
+                        if (!inList) {
+                        html += '<ul>';
+                        inList = true;
+                        }
+                        html += `<li>${formatBold(line.replace(/^(\*|-)\s*/, ''))}</li>`;
+                        return;
+                    }
+
+                    // Normal paragraph
+                    if (line !== '') {
+                        if (inList) {
+                        html += '</ul>';
+                        inList = false;
+                        }
+                        html += `<p>${formatBold(line)}</p>`;
+;
+                    }
+                    });
+
+                    if (inList) html += '</ul>';
+
                     contentDiv.innerHTML = `
-                        <h2>Summary for ${data.filename}</h2>
-                        <p>${data.summary}</p>
+                    <h1>Summary for ${data.filename}</h1>
+                    <div class="summary-text">
+                        ${html}
+                    </div>
                     `;
+
                 } else {
                     throw new Error(data.error || 'Failed to analyze PDF.');
                 }

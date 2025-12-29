@@ -485,3 +485,49 @@ input[type="file"] {
     padding: 16px;
   }
 }
+.summary-text {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #e5e7eb;
+}
+
+.summary-text h1 {
+  margin-bottom: 16px;
+}
+
+.summary-text h2 {
+  margin-top: 24px;
+  margin-bottom: 10px;
+  font-size: 18px;
+  color: #38bdf8;
+}
+
+.summary-text h3 {
+  margin-top: 18px;
+  margin-bottom: 6px;
+  font-size: 16px;
+  color: #60a5fa;
+}
+
+.summary-text p {
+  margin-bottom: 10px;
+}
+
+.summary-text ul {
+  margin: 8px 0 14px 24px;
+  padding-left: 16px;
+}
+
+.summary-text li {
+  margin-bottom: 6px;
+}
+
+.summary-text hr {
+  border: none;
+  border-top: 1px solid #334155;
+  margin: 20px 0;
+}
+.summary-text strong {
+  color: #facc15;
+  font-weight: 600;
+}
