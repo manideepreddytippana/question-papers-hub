@@ -55,7 +55,7 @@ async def get_summary_from_gemini(text):
     payload = {"contents": chatHistory}
     # IMPORTANT: Replace with your actual API Key
     apiKey = os.getenv('API_KEY')
-    apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={apiKey}"
+    apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={apiKey}"
     
     try:
         response = requests.post(apiUrl, json=payload, headers={'Content-Type': 'application/json'})
