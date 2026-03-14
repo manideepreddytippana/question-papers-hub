@@ -5,7 +5,6 @@ import database as db
 import PyPDF2
 import requests
 from dotenv import load_dotenv
-import aiohttp
 
 load_dotenv()
 
