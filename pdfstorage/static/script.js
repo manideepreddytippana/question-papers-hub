@@ -1,33 +1,58 @@
-// static/script.js
+
 document.addEventListener('DOMContentLoaded', () => {
     const uploadForm = document.getElementById('upload-form');
     const papersGrid = document.getElementById('papers-grid');
     const messageBox = document.getElementById('message-box');
     const searchInput = document.getElementById('search-input');
     
-    // --- START: New Element Selectors ---
     const analyzeBtn = document.getElementById('analyze-selected-btn');
     const selectedCountSpan = document.getElementById('selected-count');
     const analysisModal = document.getElementById('analysis-modal');
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
     const closeModalBtn = document.getElementById('close-modal-btn');
-    // --- END: New Element Selectors ---
+    const analysisResultsDiv = document.getElementById('analysis-results');
+    
+    // Confirm Modal Elements
+    const confirmModal = document.getElementById('confirm-modal');
+    const confirmTitle = document.getElementById('confirm-title');
+    const confirmMessage = document.getElementById('confirm-message');
+    const confirmBtn = document.getElementById('confirm-btn');
+    const cancelBtn = document.getElementById('cancel-btn');
+    
+    const branchFilterSelect = document.getElementById('branch-filter');
+    const yearFilterSelect = document.getElementById('year-filter');
+    const subjectModeRadios = document.querySelectorAll('input[name="subject-mode"]');
+    const subjectCheckboxesContainer = document.getElementById('subject-checkboxes-container');
+    
+    const batchDownloadBtn = document.getElementById('batch-download-btn');
+    const analyzeSubjectBtn = document.getElementById('analyze-subject-btn');
+    const generatePlanBtn = document.getElementById('generate-plan-btn');
 
     let allPapers = [];
-    let selectedFiles = []; // Array to store selected filenames
+    let allSubjects = [];
+    let filteredPapers = [];
+    let selectedFiles = [];
+    let deleteFilename = null;  // Store filename for deletion
 
-    // --- Populate Dropdowns ---
+    async function initializeAll() {
+        await populateDropdowns();
+        await fetchPapers();
+    }
+
     async function populateDropdowns() {
         try {
-            const [subjects, branches, regulations] = await Promise.all([
+            const [subjects, branches] = await Promise.all([
                 fetch('/api/subjects').then(res => res.json()),
-                fetch('/api/branches').then(res => res.json()),
-                fetch('/api/regulations').then(res => res.json())
+                fetch('/api/branches').then(res => res.json())
             ]);
-            populateSelect('subject', subjects);
+            
+            allSubjects = subjects;
             populateSelect('branch', branches);
-            populateSelect('regulation', regulations);
+            populateSelect('regulation', (await fetch('/api/regulations').then(r => r.json())));
+            populateSelect('subject', subjects);
+            populateSelect('branch-filter', branches);
+            populateSubjectCheckboxes(subjects);
         } catch (error) {
             console.error('Error populating dropdowns:', error);
             showMessage('Failed to load form options.', 'error');
@@ -36,104 +61,146 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function populateSelect(elementId, options) {
         const select = document.getElementById(elementId);
+        if (!select) return;
+        
+        const currentValue = select.value;
         select.innerHTML = '<option value="">Select an option</option>';
         options.forEach(option => {
             const opt = document.createElement('option');
-            opt.value = option;
-            opt.textContent = option;
+            opt.value = typeof option === 'string' ? option : option;
+            opt.textContent = typeof option === 'string' ? option : option;
             select.appendChild(opt);
+        });
+        select.value = currentValue;
+    }
+
+    function populateSubjectCheckboxes(subjects) {
+        subjectCheckboxesContainer.innerHTML = '';
+        subjects.forEach(subject => {
+            const div = document.createElement('div');
+            div.className = 'subject-checkbox';
+            div.innerHTML = `
+                <input type="checkbox" id="subject-${subject}" value="${subject}" name="subject" checked>
+                <label for="subject-${subject}">${subject}</label>
+            `;
+            subjectCheckboxesContainer.appendChild(div);
+            
+            div.querySelector('input').addEventListener('change', () => {
+                applyFilters();
+            });
         });
     }
 
-    // --- Fetch and Display Papers ---
+    subjectModeRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            if (e.target.value === 'individual') {
+                subjectCheckboxesContainer.style.display = 'grid';
+                document.querySelectorAll('.subject-checkbox input').forEach(cb => {
+                    cb.disabled = false;
+                });
+            } else {
+                subjectCheckboxesContainer.style.display = 'none';
+                // Select all when in "Select All" mode
+                document.querySelectorAll('.subject-checkbox input').forEach(cb => {
+                    cb.checked = true;
+                });
+            }
+            applyFilters();
+        });
+    });
+
+    function getSelectedSubjects() {
+        const mode = document.querySelector('input[name="subject-mode"]:checked').value;
+        if (mode === 'all') {
+            return allSubjects;
+        } else {
+            return Array.from(document.querySelectorAll('.subject-checkbox input:checked'))
+                .map(cb => cb.value);
+        }
+    }
+
     async function fetchPapers() {
         try {
             const response = await fetch('/api/papers');
             if (!response.ok) throw new Error('Network response was not ok');
             allPapers = await response.json();
-            displayPapers(allPapers);
+            applyFilters();
+            attachCheckboxListeners();
         } catch (error) {
             console.error('Error fetching papers:', error);
             papersGrid.innerHTML = '<p>Could not fetch papers. Please try again later.</p>';
         }
     }
 
-// In script.js, find the displayPapers function and modify the card.innerHTML
-
-function displayPapers(papers) {
-    papersGrid.innerHTML = '';
-    if (papers.length === 0) {
-        papersGrid.innerHTML = '<p>No question papers found.</p>';
-        return;
-    }
-    papers.forEach(paper => {
-        const card = document.createElement('div');
-        card.className = 'paper-card';
+    async function applyFilters() {
+        const branch = branchFilterSelect.value || null;
+        const year = yearFilterSelect.value || null;
+        const subjects = getSelectedSubjects();
         
-        // MODIFICATION: Added the new delete button inside .paper-card-header
-        card.innerHTML = `
-            <div class="paper-card-header">
-                 <input type="checkbox" class="select-checkbox" data-filename="${paper.filename}">
-                 <button class="btn-delete" data-filename="${paper.filename}" title="Delete Paper">&times;</button>
-            </div>
-            <div class="paper-card-content">
-                <h3>${paper.subject}</h3>
-                <p><strong>Branch:</strong> ${paper.branch}</p>
-                <p><strong>Regulation:</strong> ${paper.regulation}</p>
-                <p><strong>Uploaded:</strong> ${new Date(paper.upload_date).toLocaleDateString()}</p>
-            </div>
-            <div class="paper-card-footer">
-                <a href="/uploads/${paper.filename}" class="btn-download" target="_blank" rel="noopener noreferrer">View</a>
-                <a href="/summary/${paper.filename}" class="btn-analyze" data-filename="${paper.filename}">Analyze</a>
-            </div>
-        `;
-        papersGrid.appendChild(card);
-    });
-
-    // This listener for checkboxes can remain as is
-    document.querySelectorAll('.select-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', handleFileSelection);
-    });
-}
-    // Add this code to your script.js file
-
-// Use event delegation for the delete buttons
-papersGrid.addEventListener('click', function(event) {
-    if (event.target.classList.contains('btn-delete')) {
-        handleDelete(event);
-    }
-});
-
-async function handleDelete(event) {
-    const button = event.target;
-    const filename = button.dataset.filename;
-
-    // Ask for confirmation before deleting
-    if (!confirm(`Are you sure you want to delete the paper "${filename}"? This action cannot be undone.`)) {
-        return;
+        try {
+            const response = await fetch('/api/filter-papers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ branch, year, subjects })
+            });
+            
+            filteredPapers = await response.json();
+            displayPapers(filteredPapers);
+            attachCheckboxListeners();
+        } catch (error) {
+            console.error('Error filtering papers:', error);
+            filteredPapers = allPapers;
+            displayPapers(allPapers);
+            attachCheckboxListeners();
+        }
     }
 
-    try {
-        const response = await fetch(`/api/paper/delete/${filename}`, {
-            method: 'DELETE',
+    function displayPapers(papers) {
+        papersGrid.innerHTML = '';
+        if (papers.length === 0) {
+            papersGrid.innerHTML = '<p>No question papers found.</p>';
+            return;
+        }
+
+        papers.forEach(paper => {
+            const card = document.createElement('div');
+            card.className = 'paper-card';
+            
+            card.innerHTML = `
+                <div class="paper-card-header">
+                     <input type="checkbox" class="select-checkbox" data-filename="${paper.filename}">
+                     <button class="btn-delete" data-filename="${paper.filename}" title="Delete Paper">&times;</button>
+                </div>
+                <div class="paper-card-content">
+                    <h3>${paper.subject}</h3>
+                    <p><strong>Branch:</strong> ${paper.branch}</p>
+                    <p><strong>Regulation:</strong> ${paper.regulation}</p>
+                    <p><strong>Uploaded:</strong> ${new Date(paper.upload_date).toLocaleDateString()}</p>
+                </div>
+                <div class="paper-card-footer">
+                    <a href="/uploads/${paper.filename}" class="btn-download" target="_blank" rel="noopener noreferrer">View</a>
+                    <a href="/summary/${paper.filename}" class="btn-analyze" data-filename="${paper.filename}">Analyze</a>
+                </div>
+            `;
+            papersGrid.appendChild(card);
         });
 
-        const result = await response.json();
-
-        if (response.ok) {
-            // Remove the card from the UI on success
-            button.closest('.paper-card').remove();
-            showMessage('File deleted successfully!', 'success');
-        } else {
-            throw new Error(result.error || 'Failed to delete file.');
-        }
-    } catch (error) {
-        console.error('Delete error:', error);
-        showMessage(`Error: ${error.message}`, 'error');
+        attachCheckboxListeners();
     }
-}
-    
-    // --- START: New Functions for Multi-File Analysis ---
+
+    function attachCheckboxListeners() {
+        document.querySelectorAll('.select-checkbox').forEach(checkbox => {
+            checkbox.removeEventListener('change', handleFileSelection);
+            checkbox.addEventListener('change', handleFileSelection);
+        });
+
+        papersGrid.removeEventListener('click', handleDelete);
+        papersGrid.addEventListener('click', function(event) {
+            if (event.target.classList.contains('btn-delete')) {
+                handleDelete(event);
+            }
+        });
+    }
 
     function handleFileSelection(event) {
         const filename = event.target.dataset.filename;
@@ -157,15 +224,268 @@ async function handleDelete(event) {
         }
     }
 
+    async function handleDelete(event) {
+        const button = event.target;
+        const filename = button.dataset.filename;
+        deleteFilename = filename;  // Store for later use
+        
+        // Show confirm modal
+        confirmTitle.textContent = 'Confirm Deletion';
+        confirmMessage.textContent = `Are you sure you want to delete the paper "${filename}"? This action cannot be undone.`;
+        confirmModal.style.display = 'flex';
+        
+        // Focus on delete button for enter key
+        confirmBtn.focus();
+    }
+
+    // Confirm Modal Event Listeners
+    confirmBtn.addEventListener('click', async () => {
+        if (!deleteFilename) return;
+        
+        const filename = deleteFilename;
+        confirmModal.style.display = 'none';
+        
+        try {
+            const response = await fetch(`/api/paper/delete/${filename}`, {
+                method: 'DELETE',
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // Find and remove the card
+                const card = document.querySelector(`[data-filename="${filename}"]`).closest('.paper-card');
+                if (card) card.remove();
+                
+                showMessage('File deleted successfully!', 'success');
+                await fetchPapers();
+            } else {
+                throw new Error(result.error || 'Failed to delete file.');
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            showMessage(`Error: ${error.message}`, 'error');
+        }
+        
+        deleteFilename = null;
+    });
+
+    cancelBtn.addEventListener('click', () => {
+        confirmModal.style.display = 'none';
+        deleteFilename = null;
+    });
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && confirmModal.style.display === 'flex') {
+            confirmModal.style.display = 'none';
+            deleteFilename = null;
+        }
+        
+        // Confirm deletion on Enter key
+        if (e.key === 'Enter' && confirmModal.style.display === 'flex') {
+            confirmBtn.click();
+        }
+    });
+
+    async function handleBatchDownload() {
+        const papers = filteredPapers.length > 0 ? filteredPapers : allPapers;
+
+        if (papers.length === 0) {
+            showMessage('No papers found to download.', 'error');
+            return;
+        }
+
+        showLoadingModal(`Preparing ${papers.length} papers...`);
+
+        try {
+            const response = await fetch('/api/batch-download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    filenames: papers.map(p => p.filename)
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Batch download failed');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `papers-${new Date().toISOString().split('T')[0]}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+
+            closeModal();
+            showMessage(`Downloaded ${papers.length} papers!`, 'success');
+        } catch (error) {
+            console.error('Download error:', error);
+            closeModal();
+            showMessage(`Error: ${error.message}`, 'error');
+        }
+    }
+
+    async function handleAnalyzeSubject() {
+        const papers = filteredPapers.length > 0 ? filteredPapers : allPapers;
+
+        if (papers.length === 0) {
+            showMessage('No papers found to analyze.', 'error');
+            return;
+        }
+
+        showLoadingModal(`Analyzing ${papers.length} papers for patterns...`);
+
+        try {
+            const response = await fetch('/api/analyze-subject', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    filenames: papers.map(p => p.filename),
+                    branch: branchFilterSelect.value,
+                    year: yearFilterSelect.value,
+                    subjects: getSelectedSubjects()
+                })
+            });
+
+            const result = await response.json();
+            closeModal();
+            displayAnalysisResults(result);
+        } catch (error) {
+            console.error('Analysis error:', error);
+            closeModal();
+            showMessage('Error analyzing papers: ' + error.message, 'error');
+        }
+    }
+
+    function displayAnalysisResults(result) {
+        analysisResultsDiv.style.display = 'block';
+        let html = '<h2>📊 Subject Analysis Results</h2>';
+
+        html += `
+            <div class="question-pattern-card">
+                <h4>Analysis Summary</h4>
+                <p><strong>Total Questions Found:</strong> ${result.total_questions_found}</p>
+                <p><strong>Similar Question Groups:</strong> ${result.similar_patterns}</p>
+            </div>
+        `;
+
+        // Most Repeated Questions
+        html += '<h3>🔄 Most Repeated Questions</h3>';
+        if (result.repeated_questions && result.repeated_questions.length > 0) {
+            result.repeated_questions.forEach((q, idx) => {
+                html += `
+                    <div class="question-pattern-card">
+                        <h4>Question ${idx + 1}</h4>
+                        <p>${q.question_text}</p>
+                        <div>
+                            <span class="importance-badge">Appears ${q.frequency} time(s)</span>
+                            <span class="importance-badge" style="background: rgba(40,167,69,0.2); color: #28a745; border-color: rgba(40,167,69,0.3);">Importance: ${q.importance}%</span>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            html += '<p>No repeated questions found.</p>';
+        }
+
+        // Important Topics
+        html += '<h3>📌 Important Topics to Focus On</h3>';
+        if (result.important_topics && result.important_topics.length > 0) {
+            result.important_topics.forEach(topic => {
+                html += `
+                    <div class="question-pattern-card">
+                        <h4>${topic.name}</h4>
+                        <p>${topic.description}</p>
+                    </div>
+                `;
+            });
+        } else {
+            html += '<p>No specific topics identified.</p>';
+        }
+
+        analysisResultsDiv.innerHTML = html;
+        analysisResultsDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function handleGenerateLearningPlan() {
+        const papers = filteredPapers.length > 0 ? filteredPapers : allPapers;
+
+        if (papers.length === 0) {
+            showMessage('No papers found to analyze.', 'error');
+            return;
+        }
+
+        showLoadingModal('Generating personalized learning plan...');
+
+        try {
+            const response = await fetch('/api/generate-learning-plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filenames: papers.map(p => p.filename),
+                    branch: branchFilterSelect.value,
+                    year: yearFilterSelect.value,
+                    subjects: getSelectedSubjects()
+                })
+            });
+
+            const result = await response.json();
+            closeModal();
+            displayLearningPlan(result);
+        } catch (error) {
+            console.error('Learning plan error:', error);
+            closeModal();
+            showMessage('Error generating learning plan: ' + error.message, 'error');
+        }
+    }
+
+    function displayLearningPlan(plan) {
+        analysisResultsDiv.style.display = 'block';
+        
+        let html = `
+            <div class="learning-plan-container">
+                <h2>📚 Personalized Learning Plan</h2>
+                <p><strong>Recommended Study Duration:</strong> ${plan.recommended_study_period}</p>
+                <p><strong>Difficulty Progression:</strong> ${plan.difficulty_progression}</p>
+                
+                <h3>Study Focus Areas</h3>
+        `;
+
+        if (plan.focus_areas && plan.focus_areas.length > 0) {
+            plan.focus_areas.forEach((area, idx) => {
+                html += `
+                    <div class="study-focus-area">
+                        <strong>${idx + 1}. ${area.topic}</strong>
+                        <p>${area.description}</p>
+                        <small><strong>Priority:</strong> ${area.priority} | <strong>Estimated Time:</strong> ${area.estimated_hours}h</small>
+                    </div>
+                `;
+            });
+        }
+
+        html += `
+                <h3>Study Strategy</h3>
+                <p>${plan.strategy}</p>
+            </div>
+        `;
+
+        analysisResultsDiv.innerHTML = html;
+        analysisResultsDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+
     async function analyzeMultipleFiles() {
         const userPrompt = prompt("Please enter your analysis instruction (e.g., 'Find repeated or similar questions between these papers'):");
         if (!userPrompt) {
-            return; // User cancelled the prompt
+            return;
         }
 
-        modalTitle.textContent = "Analyzing...";
-        modalBody.textContent = "Please wait while the analysis is in progress. This may take a moment.";
-        analysisModal.style.display = 'flex';
+        showLoadingModal("Analyzing selected files...");
 
         try {
             const response = await fetch('/api/analyze-multiple', {
@@ -183,75 +503,83 @@ async function handleDelete(event) {
                 throw new Error(result.error || 'Analysis failed.');
             }
             
+            closeModal();
             modalTitle.textContent = "Analysis Result";
-            modalBody.textContent = result.analysis_result;
+            modalBody.innerHTML = `<p>${result.analysis_result}</p>`;
+            analysisModal.style.display = 'flex';
 
         } catch (error) {
             console.error('Multi-file analysis error:', error);
-            modalTitle.textContent = "Error";
-            modalBody.textContent = `An error occurred: ${error.message}`;
+            closeModal();
+            showMessage(`Error: ${error.message}`, 'error');
         }
     }
 
-    analyzeBtn.addEventListener('click', analyzeMultipleFiles);
-    closeModalBtn.addEventListener('click', () => {
-        analysisModal.style.display = 'none';
-    });
-    
-    // --- END: New Functions for Multi-File Analysis ---
-
-    // --- Handle Form Submission ---
     uploadForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+
         const formData = new FormData(uploadForm);
-        const submitButton = uploadForm.querySelector('button[type="submit"]');
-        submitButton.disabled = true;
-        submitButton.textContent = 'Uploading...';
-        showMessage('Uploading file...', 'info');
+        
         try {
             const response = await fetch('/api/upload', {
                 method: 'POST',
                 body: formData
             });
-            const result = await response.json();
+
+            const data = await response.json();
+
             if (response.ok) {
                 showMessage('File uploaded successfully!', 'success');
                 uploadForm.reset();
-                fetchPapers(); // Refresh the list
+                await fetchPapers();
             } else {
-                throw new Error(result.error || 'Upload failed');
+                showMessage('Upload failed: ' + data.error, 'error');
             }
         } catch (error) {
             console.error('Upload error:', error);
-            showMessage(`Error: ${error.message}`, 'error');
-        } finally {
-            submitButton.disabled = false;
-            submitButton.textContent = 'Upload Paper';
+            showMessage('Upload error: ' + error.message, 'error');
         }
     });
-    
-    // --- Search/Filter Functionality ---
-    searchInput.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        const filteredPapers = allPapers.filter(paper => 
-            paper.subject.toLowerCase().includes(searchTerm) ||
-            paper.branch.toLowerCase().includes(searchTerm) ||
-            paper.regulation.toLowerCase().includes(searchTerm)
-        );
-        displayPapers(filteredPapers);
-    });
 
-    // --- Utility Functions ---
-    function showMessage(message, type) {
-        messageBox.textContent = message;
+    function showLoadingModal(message) {
+        modalTitle.textContent = 'Processing...';
+        modalBody.innerHTML = `<p>${message}</p><div class="loading-spinner"></div>`;
+        analysisModal.style.display = 'flex';
+    }
+
+    function closeModal() {
+        analysisModal.style.display = 'none';
+    }
+
+    closeModalBtn.addEventListener('click', closeModal);
+
+    function showMessage(msg, type) {
         messageBox.className = `message-box ${type}`;
+        messageBox.textContent = msg;
         messageBox.style.display = 'block';
         setTimeout(() => {
             messageBox.style.display = 'none';
         }, 5000);
     }
 
-    // --- Initial Load ---
-    populateDropdowns();
-    fetchPapers();
+    branchFilterSelect.addEventListener('change', applyFilters);
+    yearFilterSelect.addEventListener('change', applyFilters);
+    
+    analyzeBtn.addEventListener('click', analyzeMultipleFiles);
+    batchDownloadBtn.addEventListener('click', handleBatchDownload);
+    analyzeSubjectBtn.addEventListener('click', handleAnalyzeSubject);
+    generatePlanBtn.addEventListener('click', handleGenerateLearningPlan);
+
+    // Search functionality
+    searchInput.addEventListener('input', (e) => {
+        const search = e.target.value.toLowerCase();
+        const filtered = allPapers.filter(p => 
+            p.subject.toLowerCase().includes(search) || 
+            p.branch.toLowerCase().includes(search)
+        );
+        displayPapers(filtered);
+        attachCheckboxListeners();
+    });
+
+    initializeAll();
 });
