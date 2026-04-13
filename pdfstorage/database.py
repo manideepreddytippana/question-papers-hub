@@ -148,8 +148,153 @@ def delete_paper(filename):
             print(f"Warning: No record found with filename '{filename}' to delete.")
     except mysql.connector.Error as err:
         print(f"Failed to delete record: {err}")
-        conn.rollback()
-        raise err
+    finally:
+        cursor.close()
+        conn.close()
+
+# ===== NEW FUNCTIONS FOR ENHANCED FEATURES =====
+
+def get_papers_by_filters(branch=None, year=None, subject_ids=None):
+    """Retrieves papers based on filters."""
+    conn = get_db()
+    if not conn:
+        return []
+    
+    cursor = conn.cursor(dictionary=True)
+    query = 'SELECT * FROM papers WHERE 1=1'
+    params = []
+    
+    if branch:
+        query += ' AND branch = %s'
+        params.append(branch)
+    
+    if year:
+        query += ' AND CONCAT(year, "-", semester) = %s'
+        params.append(year)
+    
+    if subject_ids:
+        placeholders = ','.join(['%s'] * len(subject_ids))
+        query += f' AND subject IN ({placeholders})'
+        params.extend(subject_ids)
+    
+    query += ' ORDER BY upload_date DESC'
+    
+    try:
+        cursor.execute(query, params)
+        papers = cursor.fetchall()
+        for paper in papers:
+            if 'upload_date' in paper and paper['upload_date']:
+                paper['upload_date'] = paper['upload_date'].isoformat()
+        return papers
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_years():
+    """Retrieves all available years."""
+    conn = get_db()
+    if not conn:
+        return []
+    
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            SELECT DISTINCT CONCAT(year, '-', semester) as year_sem
+            FROM years
+            ORDER BY year, semester
+        ''')
+        return [row[0] for row in cursor.fetchall()]
+    finally:
+        cursor.close()
+        conn.close()
+
+def add_questions(paper_id, questions_list):
+    """Adds extracted questions to database."""
+    conn = get_db()
+    if not conn:
+        raise Exception("Database connection failed")
+    
+    cursor = conn.cursor()
+    query = '''INSERT INTO questions 
+               (paper_id, question_text, question_number, question_type) 
+               VALUES (%s, %s, %s, %s)'''
+    
+    try:
+        for idx, q in enumerate(questions_list, 1):
+            cursor.execute(query, (paper_id, q.get('text'), idx, q.get('type', 'Unknown')))
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_pattern_group(subject_id, branch_id):
+    """Retrieves similar question patterns."""
+    conn = get_db()
+    if not conn:
+        return []
+    
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute('''
+            SELECT * FROM question_patterns
+            WHERE subject_id = %s AND branch_id = %s
+            ORDER BY importance_score DESC
+        ''', (subject_id, branch_id))
+        return cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
+
+def save_learning_plan(subject_id, branch_id, year, plan_data):
+    """Saves generated learning plan."""
+    import json
+    conn = get_db()
+    if not conn:
+        raise Exception("Database connection failed")
+    
+    cursor = conn.cursor()
+    query = '''INSERT INTO learning_plans
+               (subject_id, branch_id, year, analysis_result, top_questions, study_focus_areas)
+               VALUES (%s, %s, %s, %s, %s, %s)'''
+    
+    try:
+        cursor.execute(query, (
+            subject_id,
+            branch_id,
+            year,
+            plan_data.get('analysis', ''),
+            json.dumps(plan_data.get('top_questions', [])),
+            json.dumps(plan_data.get('focus_areas', []))
+        ))
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_subjects_dict():
+    """Retrieves all subjects as dictionary."""
+    conn = get_db()
+    if not conn:
+        return {}
+    
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute('SELECT id, name FROM subjects ORDER BY name')
+        return {row['name']: row['id'] for row in cursor.fetchall()}
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_branches_dict():
+    """Retrieves all branches as dictionary."""
+    conn = get_db()
+    if not conn:
+        return {}
+    
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute('SELECT id, name FROM branches ORDER BY name')
+        return {row['name']: row['id'] for row in cursor.fetchall()}
     finally:
         cursor.close()
         conn.close()
