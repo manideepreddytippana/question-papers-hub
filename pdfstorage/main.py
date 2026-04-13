@@ -1,10 +1,16 @@
 import os
-from flask import Flask, request, jsonify, send_from_directory, url_for
+from flask import Flask, request, jsonify, send_from_directory, url_for, send_file
 from werkzeug.utils import secure_filename
 import database as db
 import PyPDF2
 import requests
 from dotenv import load_dotenv
+import io
+import zipfile
+import json
+from datetime import datetime
+import numpy as np
+from question_processor import QuestionExtractor, QuestionAnalyzer
 
 load_dotenv()
 
@@ -29,11 +35,12 @@ STATIC_SUBJECTS = [
 ]
 
 STATIC_BRANCHES = [
-    'Computer Science',
-    'Information Technology',
-    'Electronics and Communication',
-    'Mechanical Engineering',
-    'Civil Engineering'
+    'CSE',
+    'CSE (AI & ML)',
+    'CSE (Cyber Security)',
+    'CSE (Data Science)',
+    'CSE (IoT)',
+    'CSE (AI & DS)'
 ]
 
 STATIC_REGULATIONS = [
@@ -253,6 +260,320 @@ def get_branches():
 @app.route('/api/regulations', methods=['GET'])
 def get_regulations():
     return jsonify(STATIC_REGULATIONS)
+
+# ===== NEW ENDPOINTS FOR ENHANCED FEATURES =====
+
+@app.route('/api/years', methods=['GET'])
+def get_years_api():
+    """Get all available years/semesters."""
+    years = db.get_years()
+    return jsonify(years)
+
+@app.route('/api/filter-papers', methods=['POST'])
+def filter_papers():
+    """Filter papers by branch, year, subject."""
+    data = request.json
+    branch = data.get('branch') or None
+    year = data.get('year') or None
+    subjects = data.get('subjects', [])
+    
+    papers = db.get_papers_by_filters(branch, year, subjects if subjects else None)
+    return jsonify(papers)
+
+@app.route('/api/batch-download', methods=['POST'])
+def batch_download():
+    """Download multiple papers as ZIP."""
+    data = request.json
+    filenames = data.get('filenames', [])
+    
+    if not filenames:
+        return jsonify({"error": "No files to download"}), 400
+    
+    # Create ZIP file in memory
+    memory_file = io.BytesIO()
+    try:
+        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for filename in filenames:
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename))
+                if os.path.exists(filepath):
+                    arcname = os.path.basename(filepath)
+                    zf.write(filepath, arcname=arcname)
+        
+        memory_file.seek(0)
+        return send_file(
+            memory_file,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'papers_{datetime.now().strftime("%Y%m%d_%H%M%S")}.zip'
+        )
+    except Exception as e:
+        return jsonify({"error": f"Error creating ZIP: {str(e)}"}), 500
+
+@app.route('/api/analyze-subject', methods=['POST'])
+async def analyze_subject():
+    """Analyze all papers of a subject for patterns."""
+    data = request.json
+    filenames = data.get('filenames', [])
+    
+    if not filenames:
+        return jsonify({"error": "No files to analyze"}), 400
+    
+    extractor = QuestionExtractor()
+    analyzer = QuestionAnalyzer()
+    all_questions = []
+    
+    # Extract questions from all PDFs
+    for filename in filenames:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename))
+        if os.path.exists(filepath):
+            text = extractor.extract_text_from_pdf(filepath)
+            questions = extractor.split_into_questions(text)
+            all_questions.extend(questions)
+    
+    if not all_questions:
+        return jsonify({
+            "repeated_questions": [],
+            "important_topics": [],
+            "total_questions_found": 0,
+            "similar_patterns": 0
+        })
+    
+    try:
+        # Find similar questions
+        question_texts = [q for q in all_questions]
+        similar_groups = analyzer.find_similar_questions(question_texts, threshold=0.6)
+        
+        # Calculate importance
+        importance_scores = analyzer.calculate_importance(question_texts, len(filenames))
+        
+        # Prepare results - get top repeated questions
+        repeated_questions = []
+        for group in sorted(similar_groups, key=lambda x: x['count'], reverse=True)[:10]:
+            group_questions = [all_questions[i] for i in group['indices']]
+            avg_importance = int(np.mean([importance_scores.get(i, 0) for i in group['indices']]))
+            repeated_questions.append({
+                'question_text': group_questions[0][:200] + '...' if len(group_questions[0]) > 200 else group_questions[0],
+                'frequency': group['count'],
+                'importance': min(100, max(0, avg_importance))
+            })
+        
+        # Extract important topics using AI
+        try:
+            sample_questions = "\n".join(all_questions[:20])
+            important_topics = await get_summary_from_gemini(
+                f"Analyze these exam questions and identify 5 most important topics to study. "
+                f"Return as a numbered list:\n\n{sample_questions}"
+            )
+            topics = parse_important_topics(important_topics)
+        except:
+            topics = extract_topics_from_questions(all_questions)
+        
+        return jsonify({
+            'repeated_questions': repeated_questions,
+            'important_topics': topics,
+            'total_questions_found': len(all_questions),
+            'similar_patterns': len(similar_groups)
+        })
+    
+    except Exception as e:
+        print(f"Analysis error: {e}")
+        return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
+
+@app.route('/api/generate-learning-plan', methods=['POST'])
+async def generate_learning_plan():
+    """Generate personalized learning plan."""
+    data = request.json
+    filenames = data.get('filenames', [])
+    branch = data.get('branch', 'General')
+    year = data.get('year', '1-1')
+    
+    if not filenames:
+        return jsonify({"error": "No files to analyze"}), 400
+    
+    extractor = QuestionExtractor()
+    all_questions = []
+    question_types = {}
+    difficulties = {}
+    
+    try:
+        # Extract and classify questions
+        for filename in filenames:
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename))
+            if os.path.exists(filepath):
+                text = extractor.extract_text_from_pdf(filepath)
+                questions = extractor.split_into_questions(text)
+                
+                for q in questions:
+                    all_questions.append(q)
+                    q_type = extractor.classify_question_type(q)
+                    difficulty = extractor.estimate_difficulty(q, q_type)
+                    
+                    question_types[q_type] = question_types.get(q_type, 0) + 1
+                    difficulties[difficulty] = difficulties.get(difficulty, 0) + 1
+        
+        if not all_questions:
+            # Return default plan
+            return jsonify({
+                'recommended_study_period': '4-6 weeks',
+                'difficulty_progression': 'Easy → Medium → Hard',
+                'focus_areas': [
+                    {
+                        'topic': 'Core Concepts',
+                        'description': 'Focus on fundamental concepts',
+                        'priority': 'High',
+                        'estimated_hours': 20
+                    }
+                ],
+                'strategy': 'Study systematically and practice regularly'
+            })
+        
+        # Generate learning plan using Gemini
+        prompt = f"""
+        Based on {len(filenames)} exam papers for {branch}, Year {year}, create a learning plan.
+        
+        Question Statistics:
+        - Total Questions: {len(all_questions)}
+        - By Type: {json.dumps(question_types)}
+        - By Difficulty: {json.dumps(difficulties)}
+        
+        Sample Questions:
+        {chr(10).join(all_questions[:15])}
+        
+        Generate a JSON response with:
+        {{
+            "recommended_study_period": "number of weeks",
+            "difficulty_progression": "progression strategy",
+            "focus_areas": [
+                {{"topic": "Example", "description": "Why focus", "priority": "High", "estimated_hours": 10}}
+            ],
+            "strategy": "Overall study strategy"
+        }}
+        """
+        
+        try:
+            api_response = await get_summary_from_gemini(prompt)
+            # Try to extract JSON from response
+            json_start = api_response.find('{')
+            json_end = api_response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                json_str = api_response[json_start:json_end]
+                plan_data = json.loads(json_str)
+            else:
+                plan_data = create_default_learning_plan(question_types, difficulties)
+        except:
+            plan_data = create_default_learning_plan(question_types, difficulties)
+        
+        return jsonify(plan_data)
+    
+    except Exception as e:
+        print(f"Learning plan error: {e}")
+        return jsonify({"error": f"Plan generation failed: {str(e)}"}), 500
+
+# ===== HELPER FUNCTIONS =====
+
+def parse_important_topics(gemini_response):
+    """Parses Gemini response to extract important topics."""
+    topics = []
+    lines = gemini_response.split('\n')
+    
+    for line in lines[:10]:
+        line = line.strip()
+        if line and len(line) > 5:
+            # Remove numbering if present
+            clean_line = line.lstrip('0123456789.). ')
+            if clean_line:
+                topics.append({
+                    'name': clean_line.split('-')[0].strip() if '-' in clean_line else clean_line,
+                    'description': clean_line
+                })
+    
+    return topics[:5]
+
+def extract_topics_from_questions(questions):
+    """Extracts topics from question text without AI."""
+    topics = []
+    topic_keywords = {
+        'Derivation': ['derive', 'derive', 'prove', 'prove'],
+        'Problem Solving': ['solve', 'calculate', 'compute', 'find'],
+        'Definitions': ['define', 'define', 'state', 'discuss'],
+        'Applications': ['apply', 'application', 'example', 'implement'],
+        'Analysis': ['analyze', 'compare', 'explain', 'analyze']
+    }
+    
+    for topic_name, keywords in topic_keywords.items():
+        count = 0
+        for q in questions:
+            for keyword in keywords:
+                if keyword.lower() in q.lower():
+                    count += 1
+        if count > 0:
+            topics.append({
+                'name': topic_name,
+                'description': f'Found in {count} questions'
+            })
+    
+    return topics[:5]
+
+def create_default_learning_plan(question_types, difficulties):
+    """Creates a default learning plan based on question statistics."""
+    
+    # Determine study duration based on question count
+    total_questions = sum(question_types.values())
+    if total_questions > 50:
+        period = '6-8 weeks'
+    elif total_questions > 30:
+        period = '4-6 weeks'
+    else:
+        period = '2-4 weeks'
+    
+    # Create focus areas based on question types
+    focus_areas = []
+    
+    if question_types.get('MCQ', 0) > 0:
+        focus_areas.append({
+            'topic': 'Multiple Choice Questions',
+            'description': f'Practice {question_types.get("MCQ", 0)} MCQ questions',
+            'priority': 'High',
+            'estimated_hours': 10
+        })
+    
+    if question_types.get('Short Answer', 0) > 0:
+        focus_areas.append({
+            'topic': 'Short Answer Questions',
+            'description': f'Practice {question_types.get("Short Answer", 0)} short answer questions',
+            'priority': 'High',
+            'estimated_hours': 15
+        })
+    
+    if question_types.get('Essay', 0) > 0:
+        focus_areas.append({
+            'topic': 'Essay Questions',
+            'description': f'Write essays for {question_types.get("Essay", 0)} questions',
+            'priority': 'High',
+            'estimated_hours': 20
+        })
+    
+    if not focus_areas:
+        focus_areas.append({
+            'topic': 'Core Concepts',
+            'description': 'Master fundamental concepts',
+            'priority': 'High',
+            'estimated_hours': 20
+        })
+    
+    focus_areas.append({
+        'topic': 'Revision & Mock Tests',
+        'description': 'Final revision and practice tests',
+        'priority': 'Medium',
+        'estimated_hours': 10
+    })
+    
+    return {
+        'recommended_study_period': period,
+        'difficulty_progression': f"Easy (focus on {difficulties.get('Easy', 0)} questions) → Medium → Hard",
+        'focus_areas': focus_areas[:5],
+        'strategy': 'Study systematically from easy to hard questions, practice regularly, and take mock tests before the exam.'
+    }
 
 if __name__ == '__main__':
     app.run(debug=True)
