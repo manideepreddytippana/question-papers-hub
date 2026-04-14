@@ -53,21 +53,31 @@ def init_db():
         cursor.close()
         conn.close()
 
-def add_paper(subject, branch, regulation, filename):
+def add_paper(subject, branch, regulation, filename, semester=None, year=None):
     """Adds a new question paper record to the database."""
     conn = get_db()
     if not conn:
         raise Exception("Database connection failed")
     
     cursor = conn.cursor()
-    query = ('INSERT INTO papers (subject, branch, regulation, filename) '
-             'VALUES (%s, %s, %s, %s)')
-    try:
-        cursor.execute(query, (subject, branch, regulation, filename))
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    if semester or year:
+        query = ('INSERT INTO papers (subject, branch, regulation, filename, semester, year) '
+                 'VALUES (%s, %s, %s, %s, %s, %s)')
+        try:
+            cursor.execute(query, (subject, branch, regulation, filename, semester, year))
+            conn.commit()
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        query = ('INSERT INTO papers (subject, branch, regulation, filename) '
+                 'VALUES (%s, %s, %s, %s)')
+        try:
+            cursor.execute(query, (subject, branch, regulation, filename))
+            conn.commit()
+        finally:
+            cursor.close()
+            conn.close()
 
 def get_all_papers():
     """Retrieves all question paper records."""

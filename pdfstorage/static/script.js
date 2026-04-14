@@ -20,6 +20,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmBtn = document.getElementById('confirm-btn');
     const cancelBtn = document.getElementById('cancel-btn');
     
+    // Upload Form Elements
+    const branchSelect = document.getElementById('branch');
+    const regulationSelect = document.getElementById('regulation');
+    const semesterSelect = document.getElementById('semester');
+    const subjectSelect = document.getElementById('subject');
+    
     const branchFilterSelect = document.getElementById('branch-filter');
     const yearFilterSelect = document.getElementById('year-filter');
     const subjectModeRadios = document.querySelectorAll('input[name="subject-mode"]');
@@ -38,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function initializeAll() {
         await populateDropdowns();
         await fetchPapers();
+        attachUploadFormListeners();
     }
 
     async function populateDropdowns() {
@@ -72,6 +79,60 @@ document.addEventListener('DOMContentLoaded', () => {
             select.appendChild(opt);
         });
         select.value = currentValue;
+    }
+
+    async function updateSemestersAndSubjects() {
+        const branch = branchSelect.value;
+        const regulation = regulationSelect.value;
+        
+        semesterSelect.value = '';
+        subjectSelect.value = '';
+        
+        if (branch === 'CSE (AI & ML)' && regulation === 'R22') {
+            semesterSelect.disabled = false;
+            
+            try {
+                const semesters = await fetch(`/api/semesters?branch=${encodeURIComponent(branch)}&regulation=${encodeURIComponent(regulation)}`)
+                    .then(res => res.json());
+                
+                populateSelect('semester', semesters);
+            } catch (error) {
+                console.error('Error fetching semesters:', error);
+            }
+        } else {
+            semesterSelect.disabled = true;
+        }
+        
+        subjectSelect.disabled = true;
+    }
+
+    async function updateSubjectsForSemester() {
+        const branch = branchSelect.value;
+        const regulation = regulationSelect.value;
+        const semester = semesterSelect.value;
+        
+        if (branch === 'CSE (AI & ML)' && regulation === 'R22' && semester) {
+            try {
+                const subjects = await fetch(`/api/subjects-by-criteria?branch=${encodeURIComponent(branch)}&regulation=${encodeURIComponent(regulation)}&semester=${encodeURIComponent(semester)}`)
+                    .then(res => res.json());
+                
+                populateSelect('subject', subjects);
+                subjectSelect.disabled = false;
+                subjectSelect.value = ''; 
+            } catch (error) {
+                console.error('Error fetching subjects:', error);
+                subjectSelect.disabled = true;
+            }
+        } else {
+            subjectSelect.disabled = true;
+            subjectSelect.value = '';
+        }
+    }
+
+    function attachUploadFormListeners() {
+        branchSelect.addEventListener('change', updateSemestersAndSubjects);
+        regulationSelect.addEventListener('change', updateSemestersAndSubjects);
+        semesterSelect.addEventListener('change', updateSubjectsForSemester);
     }
 
     function populateSubjectCheckboxes(subjects) {
@@ -112,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSelectedSubjects() {
         const mode = document.querySelector('input[name="subject-mode"]:checked').value;
         if (mode === 'all') {
-            return allSubjects;
+            return []; // Return empty array to show all subjects
         } else {
             return Array.from(document.querySelectorAll('.subject-checkbox input:checked'))
                 .map(cb => cb.value);
@@ -141,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/filter-papers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ branch, year, subjects })
+                body: JSON.stringify({ branch, year, subjects: subjects.length > 0 ? subjects : null })
             });
             
             filteredPapers = await response.json();
@@ -531,6 +592,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok) {
                 showMessage('File uploaded successfully!', 'success');
                 uploadForm.reset();
+                semesterSelect.disabled = true;
+                subjectSelect.disabled = true;
                 await fetchPapers();
             } else {
                 showMessage('Upload failed: ' + data.error, 'error');

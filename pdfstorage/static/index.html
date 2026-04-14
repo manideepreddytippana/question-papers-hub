@@ -33,8 +33,14 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label for="semester">Semester</label>
+                            <select id="semester" name="semester" required disabled>
+                                <option value="" disabled selected>Select Semester</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label for="subject">Subject</label>
-                            <select id="subject" name="subject" required>
+                            <select id="subject" name="subject" required disabled>
                              <option value="" disabled selected>Select Subject</option>
                             </select>
 
@@ -126,7 +132,6 @@
         </div>
     </div>
 
-    <!-- Confirm Delete Modal -->
     <div id="confirm-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content confirm-modal-content">
             <h2 id="confirm-title">Confirm Deletion</h2>

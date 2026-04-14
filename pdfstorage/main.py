@@ -14,7 +14,6 @@ from question_processor import QuestionExtractor, QuestionAnalyzer
 
 load_dotenv()
 
-# Configuration
 basedir = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_FOLDER = os.path.join(basedir, 'uploads')
 ALLOWED_EXTENSIONS = {'pdf'}
@@ -24,7 +23,65 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Static dropdown values (no dynamic population)
+aiml_subjects = {
+    "1-1": [
+        "Matrices and Calculus (M1)",
+        "Applied Physics (AP)",
+        "Programming for Problem Solving (PPS)",
+        "English for Skill Enhancement",
+        "Environmental Science (ES)"
+    ],
+    "1-2": [
+        "Ordinary Differential Equations and Vector Calculus (ODE)",
+        "Engineering Chemistry",
+        "Computer Aided Engineering Graphics (CAEG)",
+        "Basic Electrical Engineering (BEE)",
+        "Electronic Devices and Circuits (EDC)"
+    ],
+    "2-1": [
+        "Mathematical and Statistical Foundations (MSF)",
+        "Data Structures (DS)",
+        "Computer Organization and Architecture (COA)",
+        "Software Engineering",
+        "Operating Systems (OS)"
+    ],
+    "2-2": [
+        "Discrete Mathematics (DM)",
+        "Automata Theory and Compiler Design (ATCD)",
+        "Database Management Systems (DBMS)",
+        "Introduction to Artificial Intelligence (AI)",
+        "Object Oriented Programming through Java (OOP)"
+    ],
+    "3-1": [
+        "Design and Analysis of Algorithms (DAA)",
+        "Machine Learning (ML)",
+        "Computer Networks (CN)",
+        "Business Economics & Financial Analysis (BEFA)",
+        "Web Programming (WP)",
+        "Intellectual Property Rights (IPR)"
+    ],
+    "3-2": [
+        "Fundamentals of Internet of Things (FIOT)",
+        "Software Testing Methodologies (STM)",
+        "Knowledge Representation and Reasoning (KRR)",
+        "Data Analytics (DA)",
+        "Natural Language Processing (NLP)"
+    ],
+    "4-1": [
+        "Semantic Web (SW)",
+        "Deep Learning (DL)",
+        "Cloud Computing (CC)",
+        "Nature Inspired Computing (NIC)",
+        "Electronics for Health Care (EHC)",
+        "Professional Practice, Law & Ethics (PPLE)"
+    ],
+    "4-2": [
+        "Conversational AI (CA)",
+        "AD HOC & Sensor Networks (ASN)",
+        "Fundamentals of Social Network (FSN)"
+    ]
+}
+
 STATIC_SUBJECTS = [
     'Mathematics-I',
     'Physics',
@@ -54,12 +111,9 @@ def allowed_file(filename):
     return '.' in filename and \
         filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# --- Gemini API Helper Function ---
 async def get_summary_from_gemini(text):
-    """Sends text to Gemini API and gets a summary."""
     chatHistory = [{"role": "user", "parts": [{"text": text}]}]
     payload = {"contents": chatHistory}
-    # IMPORTANT: Replace with your actual API Key
     apiKey = os.getenv('API_KEY')
     apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={apiKey}"
     
@@ -117,7 +171,6 @@ async def analyze_pdf(filename):
 
 @app.route('/api/paper/delete/<filename>', methods=['DELETE'])
 def delete_paper_file(filename):
-    """API endpoint to delete a paper."""
     if not filename:
         return jsonify({"error": "Invalid filename provided"}), 400
 
@@ -125,14 +178,10 @@ def delete_paper_file(filename):
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_filename)
 
     try:
-        # Step 1: Delete the record from the database
         db.delete_paper(safe_filename)
 
-        # Step 2: Delete the physical file from the server
         if os.path.exists(filepath):
             os.remove(filepath)
-        else:
-            print(f"Warning: File '{safe_filename}' not found on disk but DB entry was deleted.")
 
         return jsonify({"success": f"Paper '{safe_filename}' deleted successfully."}), 200
 
@@ -140,11 +189,9 @@ def delete_paper_file(filename):
         print(f"Error deleting paper {safe_filename}: {e}")
         return jsonify({"error": "An internal error occurred. Could not delete the paper."}), 500
 
-# --- Multi-File Analysis Endpoint ---
 
 @app.route('/api/analyze-multiple', methods=['POST'])
 async def analyze_multiple_pdfs():
-    """Extracts text from multiple PDFs and performs a comparative analysis."""
     data = request.get_json()
     filenames = data.get('filenames')
     user_prompt = data.get('prompt')
@@ -175,14 +222,7 @@ async def analyze_multiple_pdfs():
         except Exception as e:
             return jsonify({"error": f"Failed to read or parse {filename}: {e}"}), 500
 
-    final_prompt = (
-        "You are an expert academic assistant. Your task is to perform a detailed comparative analysis of the following university question papers.\n\n"
-        f"USER'S INSTRUCTION: \"{user_prompt}\"\n\n"
-        "Based on the user's instruction, analyze the content of the documents provided below. "
-        "When comparing questions, consider both direct textual matches and semantic similarities (i.e., questions asking the same thing with different wording). "
-        "Present your findings in a clear, well-structured, and easy-to-read format. Use markdown for formatting if appropriate.\n\n"
-        f"{combined_text}"
-    )
+    final_prompt = f"You are an expert academic assistant. Your task is to perform a detailed comparative analysis of the following university question papers.\n\nUSER'S INSTRUCTION: \"{user_prompt}\"\n\nBased on the user's instruction, analyze the content of the documents provided below. When comparing questions, consider both direct textual matches and semantic similarities (i.e., questions asking the same thing with different wording). Present your findings in a clear, well-structured, and easy-to-read format. Use markdown for formatting if appropriate.\n\n{combined_text}"
 
     try:
         analysis_result = await get_summary_from_gemini(final_prompt)
@@ -214,9 +254,17 @@ def upload_paper():
     subject = request.form.get('subject')
     branch = request.form.get('branch')
     regulation = request.form.get('regulation')
+    semester = request.form.get('semester')
 
     if not all([subject, branch, regulation]):
         return jsonify({"error": "Missing subject, branch, or regulation"}), 400
+
+    year = None
+    if semester:
+        try:
+            year = int(semester.split('-')[0])
+        except (ValueError, IndexError):
+            year = None
 
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
@@ -233,7 +281,7 @@ def upload_paper():
         file.save(filepath)
 
         try:
-            db.add_paper(subject, branch, regulation, filename)
+            db.add_paper(subject, branch, regulation, filename, semester, year)
             file_url = url_for('uploaded_file', filename=filename)
             return jsonify({"success": "File uploaded successfully", "filename": filename, "url": file_url}), 201
 
@@ -248,7 +296,6 @@ def upload_paper():
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-# Static dropdown endpoints - no database queries needed
 @app.route('/api/subjects', methods=['GET'])
 def get_subjects():
     return jsonify(STATIC_SUBJECTS)
@@ -261,17 +308,37 @@ def get_branches():
 def get_regulations():
     return jsonify(STATIC_REGULATIONS)
 
-# ===== NEW ENDPOINTS FOR ENHANCED FEATURES =====
+@app.route('/api/semesters', methods=['GET'])
+def get_semesters():
+    branch = request.args.get('branch', '')
+    regulation = request.args.get('regulation', '')
+    
+    if branch == 'CSE (AI & ML)' and regulation == 'R22':
+        semesters = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2', '4-1', '4-2']
+        return jsonify(semesters)
+    
+    return jsonify([])
+
+@app.route('/api/subjects-by-criteria', methods=['GET'])
+def get_subjects_by_criteria():
+    branch = request.args.get('branch', '')
+    regulation = request.args.get('regulation', '')
+    semester = request.args.get('semester', '')
+    
+    if branch == 'CSE (AI & ML)' and regulation == 'R22' and semester in aiml_subjects:
+        subjects = aiml_subjects[semester]
+        return jsonify(subjects)
+    
+    return jsonify(STATIC_SUBJECTS)
+
 
 @app.route('/api/years', methods=['GET'])
 def get_years_api():
-    """Get all available years/semesters."""
     years = db.get_years()
     return jsonify(years)
 
 @app.route('/api/filter-papers', methods=['POST'])
 def filter_papers():
-    """Filter papers by branch, year, subject."""
     data = request.json
     branch = data.get('branch') or None
     year = data.get('year') or None
@@ -282,14 +349,12 @@ def filter_papers():
 
 @app.route('/api/batch-download', methods=['POST'])
 def batch_download():
-    """Download multiple papers as ZIP."""
     data = request.json
     filenames = data.get('filenames', [])
     
     if not filenames:
         return jsonify({"error": "No files to download"}), 400
     
-    # Create ZIP file in memory
     memory_file = io.BytesIO()
     try:
         with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -311,7 +376,6 @@ def batch_download():
 
 @app.route('/api/analyze-subject', methods=['POST'])
 async def analyze_subject():
-    """Analyze all papers of a subject for patterns."""
     data = request.json
     filenames = data.get('filenames', [])
     
@@ -322,7 +386,6 @@ async def analyze_subject():
     analyzer = QuestionAnalyzer()
     all_questions = []
     
-    # Extract questions from all PDFs
     for filename in filenames:
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename))
         if os.path.exists(filepath):
@@ -339,14 +402,10 @@ async def analyze_subject():
         })
     
     try:
-        # Find similar questions
         question_texts = [q for q in all_questions]
         similar_groups = analyzer.find_similar_questions(question_texts, threshold=0.6)
         
-        # Calculate importance
         importance_scores = analyzer.calculate_importance(question_texts, len(filenames))
-        
-        # Prepare results - get top repeated questions
         repeated_questions = []
         for group in sorted(similar_groups, key=lambda x: x['count'], reverse=True)[:10]:
             group_questions = [all_questions[i] for i in group['indices']]
@@ -357,7 +416,6 @@ async def analyze_subject():
                 'importance': min(100, max(0, avg_importance))
             })
         
-        # Extract important topics using AI
         try:
             sample_questions = "\n".join(all_questions[:20])
             important_topics = await get_summary_from_gemini(
@@ -381,7 +439,6 @@ async def analyze_subject():
 
 @app.route('/api/generate-learning-plan', methods=['POST'])
 async def generate_learning_plan():
-    """Generate personalized learning plan."""
     data = request.json
     filenames = data.get('filenames', [])
     branch = data.get('branch', 'General')
@@ -396,7 +453,6 @@ async def generate_learning_plan():
     difficulties = {}
     
     try:
-        # Extract and classify questions
         for filename in filenames:
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename))
             if os.path.exists(filepath):
@@ -412,7 +468,6 @@ async def generate_learning_plan():
                     difficulties[difficulty] = difficulties.get(difficulty, 0) + 1
         
         if not all_questions:
-            # Return default plan
             return jsonify({
                 'recommended_study_period': '4-6 weeks',
                 'difficulty_progression': 'Easy → Medium → Hard',
@@ -427,7 +482,6 @@ async def generate_learning_plan():
                 'strategy': 'Study systematically and practice regularly'
             })
         
-        # Generate learning plan using Gemini
         prompt = f"""
         Based on {len(filenames)} exam papers for {branch}, Year {year}, create a learning plan.
         
@@ -452,7 +506,6 @@ async def generate_learning_plan():
         
         try:
             api_response = await get_summary_from_gemini(prompt)
-            # Try to extract JSON from response
             json_start = api_response.find('{')
             json_end = api_response.rfind('}') + 1
             if json_start >= 0 and json_end > json_start:
@@ -469,17 +522,13 @@ async def generate_learning_plan():
         print(f"Learning plan error: {e}")
         return jsonify({"error": f"Plan generation failed: {str(e)}"}), 500
 
-# ===== HELPER FUNCTIONS =====
-
 def parse_important_topics(gemini_response):
-    """Parses Gemini response to extract important topics."""
     topics = []
     lines = gemini_response.split('\n')
     
     for line in lines[:10]:
         line = line.strip()
         if line and len(line) > 5:
-            # Remove numbering if present
             clean_line = line.lstrip('0123456789.). ')
             if clean_line:
                 topics.append({
@@ -490,7 +539,6 @@ def parse_important_topics(gemini_response):
     return topics[:5]
 
 def extract_topics_from_questions(questions):
-    """Extracts topics from question text without AI."""
     topics = []
     topic_keywords = {
         'Derivation': ['derive', 'derive', 'prove', 'prove'],
@@ -517,7 +565,6 @@ def extract_topics_from_questions(questions):
 def create_default_learning_plan(question_types, difficulties):
     """Creates a default learning plan based on question statistics."""
     
-    # Determine study duration based on question count
     total_questions = sum(question_types.values())
     if total_questions > 50:
         period = '6-8 weeks'
@@ -526,7 +573,6 @@ def create_default_learning_plan(question_types, difficulties):
     else:
         period = '2-4 weeks'
     
-    # Create focus areas based on question types
     focus_areas = []
     
     if question_types.get('MCQ', 0) > 0:
