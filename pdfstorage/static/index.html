@@ -9,13 +9,19 @@
 </head>
 <body class="bg-gray-50 text-gray-800">
 
-    <div class="container">
-        <header>
-            <h1>Question Paper Hub</h1>
-            <p>Upload and find question papers from your university.</p>
-        </header>
+    <div class="container page-layout">
+        <aside class="sidebar" aria-label="Page navigation">
+            <h2 class="sidebar-title">Question Papers Hub</h2>
+            <a id="all-papers-link" href="#papers-section" class="sidebar-link">ALL PAPERS</a>
+        </aside>
 
-        <main>
+        <div class="content-area">
+            <header>
+                <h1>Question Paper Hub</h1>
+                <p>Upload and find question papers from your university.</p>
+            </header>
+
+            <main>
             <div class="upload-section">
                 <h2>Upload a Question Paper</h2>
                 <form id="upload-form" enctype="multipart/form-data">
@@ -115,8 +121,8 @@
                 </div>
             </div>
 
-            <div class="papers-section">
-                <h2>Available Question Papers</h2>
+            <div id="papers-section" class="papers-section">
+                <h2 id="papers-section-title" tabindex="-1">Available Question Papers</h2>
                 
                 <div class="actions-toolbar">
                     <button id="analyze-selected-btn" class="btn-analyze" disabled>
@@ -132,7 +138,8 @@
             </div>
             <div id="analysis-results" class="results-container" style="display: none;">
             </div>
-        </main>
+            </main>
+        </div>
     </div>
     
     <div id="analysis-modal" class="modal-overlay" style="display: none;">

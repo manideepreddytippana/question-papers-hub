@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalBody = document.getElementById('modal-body');
     const closeModalBtn = document.getElementById('close-modal-btn');
     const analysisResultsDiv = document.getElementById('analysis-results');
+    const allPapersLink = document.getElementById('all-papers-link');
+    const papersSection = document.getElementById('papers-section');
+    const papersSectionTitle = document.getElementById('papers-section-title');
     
     // Confirm Modal Elements
     const confirmModal = document.getElementById('confirm-modal');
@@ -736,6 +739,14 @@ document.addEventListener('DOMContentLoaded', () => {
         displayPapers(filtered);
         attachCheckboxListeners();
     });
+
+    if (allPapersLink && papersSection && papersSectionTitle) {
+        allPapersLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            papersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(() => papersSectionTitle.focus(), 250);
+        });
+    }
 
     initializeAll().then(async () => {
         await updateFilterSubjects();
