@@ -164,7 +164,7 @@ def delete_paper(filename):
 
 # ===== NEW FUNCTIONS FOR ENHANCED FEATURES =====
 
-def get_papers_by_filters(branch=None, year=None, subject_ids=None):
+def get_papers_by_filters(branch=None, regulation=None, year=None, subject_ids=None):
     """Retrieves papers based on filters."""
     conn = get_db()
     if not conn:
@@ -177,10 +177,15 @@ def get_papers_by_filters(branch=None, year=None, subject_ids=None):
     if branch:
         query += ' AND branch = %s'
         params.append(branch)
+
+    if regulation:
+        query += ' AND regulation = %s'
+        params.append(regulation)
     
     if year:
-        query += ' AND CONCAT(year, "-", semester) = %s'
-        params.append(year)
+        # Support existing records where semester can be either "1" or "1-1" style.
+        query += ' AND (semester = %s OR CONCAT(year, "-", semester) = %s)'
+        params.extend([year, year])
     
     if subject_ids:
         placeholders = ','.join(['%s'] * len(subject_ids))

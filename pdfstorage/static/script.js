@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const subjectSelect = document.getElementById('subject');
     
     const branchFilterSelect = document.getElementById('branch-filter');
+    const regulationFilterSelect = document.getElementById('regulation-filter');
     const yearFilterSelect = document.getElementById('year-filter');
     const subjectModeRadios = document.querySelectorAll('input[name="subject-mode"]');
     const subjectCheckboxesContainer = document.getElementById('subject-checkboxes-container');
@@ -56,9 +57,11 @@ document.addEventListener('DOMContentLoaded', () => {
             
             allSubjects = subjects;
             populateSelect('branch', branches);
-            populateSelect('regulation', (await fetch('/api/regulations').then(r => r.json())));
+            const regulations = await fetch('/api/regulations').then(r => r.json());
+            populateSelect('regulation', regulations);
             populateSelect('subject', subjects);
             populateSelect('branch-filter', branches);
+            populateSelect('regulation-filter', regulations);
             populateSubjectCheckboxes(subjects);
         } catch (error) {
             console.error('Error populating dropdowns:', error);
@@ -84,11 +87,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function updateSemestersAndSubjects() {
         const branch = branchSelect.value;
         const regulation = regulationSelect.value;
+        const hasSemesterSubjects = regulation === 'R22' && ['CSE (AI & ML)', 'CSE (AI & DS)'].includes(branch);
         
         semesterSelect.value = '';
         subjectSelect.value = '';
         
-        if (branch === 'CSE (AI & ML)' && regulation === 'R22') {
+        if (hasSemesterSubjects) {
             semesterSelect.disabled = false;
             
             try {
@@ -110,8 +114,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const branch = branchSelect.value;
         const regulation = regulationSelect.value;
         const semester = semesterSelect.value;
+        const hasSemesterSubjects = regulation === 'R22' && ['CSE (AI & ML)', 'CSE (AI & DS)'].includes(branch);
         
-        if (branch === 'CSE (AI & ML)' && regulation === 'R22' && semester) {
+        if (hasSemesterSubjects && semester) {
             try {
                 const subjects = await fetch(`/api/subjects-by-criteria?branch=${encodeURIComponent(branch)}&regulation=${encodeURIComponent(regulation)}&semester=${encodeURIComponent(semester)}`)
                     .then(res => res.json());
@@ -195,6 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function applyFilters() {
         const branch = branchFilterSelect.value || null;
+        const regulation = regulationFilterSelect.value || null;
         const year = yearFilterSelect.value || null;
         const subjects = getSelectedSubjects();
         
@@ -202,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/filter-papers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ branch, year, subjects: subjects.length > 0 ? subjects : null })
+                body: JSON.stringify({ branch, regulation, year, subjects: subjects.length > 0 ? subjects : null })
             });
             
             filteredPapers = await response.json();
@@ -214,6 +220,34 @@ document.addEventListener('DOMContentLoaded', () => {
             displayPapers(allPapers);
             attachCheckboxListeners();
         }
+    }
+
+    async function updateFilterSubjects() {
+        const branch = branchFilterSelect.value;
+        const regulation = regulationFilterSelect.value;
+        const semester = yearFilterSelect.value;
+        const hasSemesterSubjects = regulation === 'R22' && ['CSE (AI & ML)', 'CSE (AI & DS)'].includes(branch) && !!semester;
+
+        if (hasSemesterSubjects) {
+            try {
+                const subjects = await fetch(`/api/subjects-by-criteria?branch=${encodeURIComponent(branch)}&regulation=${encodeURIComponent(regulation)}&semester=${encodeURIComponent(semester)}`)
+                    .then(res => res.json());
+                populateSubjectCheckboxes(subjects);
+            } catch (error) {
+                console.error('Error fetching filter subjects:', error);
+                populateSubjectCheckboxes(allSubjects);
+            }
+        } else {
+            populateSubjectCheckboxes(allSubjects);
+        }
+
+        const selectedMode = document.querySelector('input[name="subject-mode"]:checked').value;
+        subjectCheckboxesContainer.style.display = selectedMode === 'individual' ? 'grid' : 'none';
+    }
+
+    async function handleFilterCriteriaChange() {
+        await updateFilterSubjects();
+        await applyFilters();
     }
 
     function displayPapers(papers) {
@@ -625,8 +659,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 5000);
     }
 
-    branchFilterSelect.addEventListener('change', applyFilters);
-    yearFilterSelect.addEventListener('change', applyFilters);
+    branchFilterSelect.addEventListener('change', handleFilterCriteriaChange);
+    regulationFilterSelect.addEventListener('change', handleFilterCriteriaChange);
+    yearFilterSelect.addEventListener('change', handleFilterCriteriaChange);
     
     analyzeBtn.addEventListener('click', analyzeMultipleFiles);
     batchDownloadBtn.addEventListener('click', handleBatchDownload);
@@ -644,5 +679,5 @@ document.addEventListener('DOMContentLoaded', () => {
         attachCheckboxListeners();
     });
 
-    initializeAll();
+    initializeAll().then(updateFilterSubjects);
 });

@@ -82,6 +82,73 @@ aiml_subjects = {
     ]
 }
 
+aids_subjects = {
+    "1-1": [
+        "Matrices and Calculus (M1)",
+        "Applied Physics (AP)",
+        "Programming for Problem Solving (PPS)",
+        "English for Skill Enhancement (ESE)",
+        "Elements of Computer Science & Engineering (ECSE)",
+        "Environmental Science (ES)"
+    ],
+    "1-2": [
+        "Ordinary Differential Equations and Vector Calculus (ODE&VC)",
+        "Engineering Chemistry (EC)",
+        "Computer Aided Engineering Graphics (CAEG)",
+        "Basic Electrical Engineering (BEE)",
+        "Electronic Devices and Circuits (EDC)"
+    ],
+    "2-1": [
+        "Mathematical and Statistical Foundations (MSF)",
+        "Digital Electronics (DE)",
+        "Data Structures (DS)",
+        "Object Oriented Programming through Java (OOPJ)",
+        "Computer Organization and Architecture (COA)"
+    ],
+    "2-2": [
+        "Discrete Mathematics (DM)",
+        "Introduction to Artificial Intelligence (AI)",
+        "Database Management Systems (DBMS)",
+        "Operating Systems (OS)",
+        "Software Engineering (SE)"
+    ],
+    "3-1": [
+        "Design and Analysis of Algorithms (DAA)",
+        "Introduction to Data Science (IDS)",
+        "Computer Networks (CN)",
+        "Business Economics & Financial Analysis (BEFA)",
+        "WEB PROGRAMMING (WP)",
+        "Intellectual Property Rights (IPR)"
+    ],
+    "3-2": [
+        "Automata Theory and Compiler Design (ATCD)",
+        "Machine Learning (ML)",
+        "Big Data Analytics (BDA)",
+        "SOFTWARE TESTING METHODOLOGIES (STM)",
+        "FUNDAMENTALS OF INTERNET OF THINGS (FIOT)",
+        "Environmental Science (ES)"
+    ],
+    "4-1": [
+        "Introduction to Predictive Analytics (IPA)",
+        "Web and Social Media Analytics (WSMA)",
+        "ELECTRONICS FOR HEALTH CARE (EHC)",
+        "Professional Practice, Law & Ethics (PPLE)",
+        "CRYPTOGRAPHY AND NETWORK SECURITY (CNS)",
+        "CLOUD COMPUTING (CC)"
+    ],
+    "4-2": [
+        "Professional Elective - V (PE5)",
+        "Professional Elective - VI (PE6)",
+        "Open Elective - III (OE3)",
+        "Project Stage - II (Project)"
+    ]
+}
+
+R22_SEMESTER_SUBJECTS = {
+    'CSE (AI & ML)': aiml_subjects,
+    'CSE (AI & DS)': aids_subjects,
+}
+
 STATIC_SUBJECTS = [
     'Mathematics-I',
     'Physics',
@@ -313,8 +380,8 @@ def get_semesters():
     branch = request.args.get('branch', '')
     regulation = request.args.get('regulation', '')
     
-    if branch == 'CSE (AI & ML)' and regulation == 'R22':
-        semesters = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2', '4-1', '4-2']
+    if regulation == 'R22' and branch in R22_SEMESTER_SUBJECTS:
+        semesters = list(R22_SEMESTER_SUBJECTS[branch].keys())
         return jsonify(semesters)
     
     return jsonify([])
@@ -325,8 +392,10 @@ def get_subjects_by_criteria():
     regulation = request.args.get('regulation', '')
     semester = request.args.get('semester', '')
     
-    if branch == 'CSE (AI & ML)' and regulation == 'R22' and semester in aiml_subjects:
-        subjects = aiml_subjects[semester]
+    subjects_by_sem = R22_SEMESTER_SUBJECTS.get(branch, {}) if regulation == 'R22' else {}
+
+    if semester in subjects_by_sem:
+        subjects = subjects_by_sem[semester]
         return jsonify(subjects)
     
     return jsonify(STATIC_SUBJECTS)
@@ -341,10 +410,11 @@ def get_years_api():
 def filter_papers():
     data = request.json
     branch = data.get('branch') or None
+    regulation = data.get('regulation') or None
     year = data.get('year') or None
     subjects = data.get('subjects', [])
     
-    papers = db.get_papers_by_filters(branch, year, subjects if subjects else None)
+    papers = db.get_papers_by_filters(branch, regulation, year, subjects if subjects else None)
     return jsonify(papers)
 
 @app.route('/api/batch-download', methods=['POST'])
