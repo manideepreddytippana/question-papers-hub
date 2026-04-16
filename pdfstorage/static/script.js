@@ -203,7 +203,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSelectedYearSemester() {
         const yearValue = yearFilterSelect.value;
         const semesterValue = semesterFilterSelect.value;
-        return (yearValue && semesterValue) ? `${yearValue}-${semesterValue}` : null;
+        if (!yearValue) return null;
+        return semesterValue ? `${yearValue}-${semesterValue}` : yearValue;
+    }
+
+    function updateBatchDownloadState() {
+        // Batch download, subject analysis, and learning plan are available only when at least a branch filter is selected.
+        const hasBranch = !!branchFilterSelect.value;
+        batchDownloadBtn.disabled = !hasBranch;
+        analyzeSubjectBtn.disabled = !hasBranch;
+        generatePlanBtn.disabled = !hasBranch;
     }
 
     async function fetchPapers() {
@@ -224,6 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const regulation = regulationFilterSelect.value || null;
         const year = getSelectedYearSemester();
         const subjects = getSelectedSubjects();
+        updateBatchDownloadState();
         
         try {
             const response = await fetch('/api/filter-papers', {
@@ -416,7 +426,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function handleBatchDownload() {
-        const papers = filteredPapers.length > 0 ? filteredPapers : allPapers;
+        if (!branchFilterSelect.value) {
+            showMessage('Select a branch to enable batch download.', 'error');
+            return;
+        }
+
+        const papers = filteredPapers;
 
         if (papers.length === 0) {
             showMessage('No papers found to download.', 'error');
@@ -459,7 +474,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleAnalyzeSubject() {
-        const papers = filteredPapers.length > 0 ? filteredPapers : allPapers;
+        if (!branchFilterSelect.value) {
+            showMessage('Select a branch to enable subject analysis.', 'error');
+            return;
+        }
+
+        const papers = filteredPapers;
 
         if (papers.length === 0) {
             showMessage('No papers found to analyze.', 'error');
@@ -541,7 +561,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleGenerateLearningPlan() {
-        const papers = filteredPapers.length > 0 ? filteredPapers : allPapers;
+        if (!branchFilterSelect.value) {
+            showMessage('Select a branch to enable learning plan generation.', 'error');
+            return;
+        }
+
+        const papers = filteredPapers;
 
         if (papers.length === 0) {
             showMessage('No papers found to analyze.', 'error');
@@ -712,5 +737,8 @@ document.addEventListener('DOMContentLoaded', () => {
         attachCheckboxListeners();
     });
 
-    initializeAll().then(updateFilterSubjects);
+    initializeAll().then(async () => {
+        await updateFilterSubjects();
+        updateBatchDownloadState();
+    });
 });

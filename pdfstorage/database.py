@@ -183,9 +183,13 @@ def get_papers_by_filters(branch=None, regulation=None, year=None, subject_ids=N
         params.append(regulation)
     
     if year:
-        # Support existing records where semester can be either "1" or "1-1" style.
-        query += ' AND (semester = %s OR CONCAT(year, "-", semester) = %s)'
-        params.extend([year, year])
+        # Accept either full year-semester format (e.g., "2-1") or year only (e.g., "2").
+        if '-' in str(year):
+            query += ' AND (semester = %s OR CONCAT(year, "-", semester) = %s)'
+            params.extend([year, year])
+        else:
+            query += ' AND year = %s'
+            params.append(year)
     
     if subject_ids:
         placeholders = ','.join(['%s'] * len(subject_ids))
