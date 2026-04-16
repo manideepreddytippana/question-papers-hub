@@ -158,13 +158,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function areSubjectCriteriaComplete() {
+        return !!(
+            branchFilterSelect.value &&
+            regulationFilterSelect.value &&
+            yearFilterSelect.value &&
+            semesterFilterSelect.value
+        );
+    }
+
+    function setSubjectPanelDisabledState(isDisabled) {
+        subjectCheckboxesContainer.classList.toggle('is-disabled', isDisabled);
+        document.querySelectorAll('.subject-checkbox input').forEach(cb => {
+            cb.disabled = isDisabled;
+        });
+    }
+
     subjectModeRadios.forEach(radio => {
-        radio.addEventListener('change', (e) => {
+        radio.addEventListener('change', async (e) => {
             if (e.target.value === 'individual') {
-                subjectCheckboxesContainer.style.display = 'grid';
-                document.querySelectorAll('.subject-checkbox input').forEach(cb => {
-                    cb.disabled = false;
-                });
+                subjectCheckboxesContainer.style.display = '';
+                await updateFilterSubjects();
             } else {
                 subjectCheckboxesContainer.style.display = 'none';
                 // Select all when in "Select All" mode
@@ -172,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     cb.checked = true;
                 });
             }
-            applyFilters();
+            await applyFilters();
         });
     });
 
@@ -235,29 +249,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const yearValue = yearFilterSelect.value;
         const semesterValue = semesterFilterSelect.value;
         const semester = (yearValue && semesterValue) ? `${yearValue}-${semesterValue}` : '';
+        const isCriteriaComplete = areSubjectCriteriaComplete();
         const hasSemesterSubjects = regulation === 'R22' && ['CSE (AI & ML)', 'CSE (AI & DS)'].includes(branch) && !!semester;
 
         subjectCheckboxesContainer.innerHTML = '';
 
-        if (hasSemesterSubjects) {
+        if (!isCriteriaComplete) {
+            subjectCheckboxesContainer.innerHTML = '<p class="subject-selection-hint">Select branch, regulation, year, and semester to enable individual subjects.</p>';
+            setSubjectPanelDisabledState(true);
+        } else if (hasSemesterSubjects) {
             try {
                 const subjects = await fetch(`/api/subjects-by-criteria?branch=${encodeURIComponent(branch)}&regulation=${encodeURIComponent(regulation)}&semester=${encodeURIComponent(semester)}`)
                     .then(res => res.json());
                 populateSubjectCheckboxes(subjects);
+                setSubjectPanelDisabledState(false);
             } catch (error) {
                 console.error('Error fetching filter subjects:', error);
                 populateSubjectCheckboxes(allSubjects);
+                setSubjectPanelDisabledState(false);
             }
         } else {
-            if (branch && regulation && yearValue && semesterValue) {
-                populateSubjectCheckboxes(allSubjects);
-            } else {
-                subjectCheckboxesContainer.innerHTML = '<p>Select branch, regulation, year, and semester to load individual subjects.</p>';
-            }
+            populateSubjectCheckboxes(allSubjects);
+            setSubjectPanelDisabledState(false);
         }
 
         const selectedMode = document.querySelector('input[name="subject-mode"]:checked').value;
-        subjectCheckboxesContainer.style.display = selectedMode === 'individual' ? 'grid' : 'none';
+        subjectCheckboxesContainer.style.display = selectedMode === 'individual' ? '' : 'none';
     }
 
     async function handleFilterCriteriaChange() {

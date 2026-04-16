@@ -620,6 +620,17 @@ input[type="file"] {
     border: 1px solid var(--border-color);
 }
 
+  #subject-checkboxes-container.is-disabled {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  #subject-checkboxes-container .subject-selection-hint {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
 .subject-checkbox {
     display: flex;
     align-items: center;
