@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const branchFilterSelect = document.getElementById('branch-filter');
     const regulationFilterSelect = document.getElementById('regulation-filter');
     const yearFilterSelect = document.getElementById('year-filter');
+    const semesterFilterSelect = document.getElementById('semester-filter');
     const subjectModeRadios = document.querySelectorAll('input[name="subject-mode"]');
     const subjectCheckboxesContainer = document.getElementById('subject-checkboxes-container');
     
@@ -185,6 +186,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function getSelectedYearSemester() {
+        const yearValue = yearFilterSelect.value;
+        const semesterValue = semesterFilterSelect.value;
+        return (yearValue && semesterValue) ? `${yearValue}-${semesterValue}` : null;
+    }
+
     async function fetchPapers() {
         try {
             const response = await fetch('/api/papers');
@@ -201,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function applyFilters() {
         const branch = branchFilterSelect.value || null;
         const regulation = regulationFilterSelect.value || null;
-        const year = yearFilterSelect.value || null;
+        const year = getSelectedYearSemester();
         const subjects = getSelectedSubjects();
         
         try {
@@ -225,8 +232,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function updateFilterSubjects() {
         const branch = branchFilterSelect.value;
         const regulation = regulationFilterSelect.value;
-        const semester = yearFilterSelect.value;
+        const yearValue = yearFilterSelect.value;
+        const semesterValue = semesterFilterSelect.value;
+        const semester = (yearValue && semesterValue) ? `${yearValue}-${semesterValue}` : '';
         const hasSemesterSubjects = regulation === 'R22' && ['CSE (AI & ML)', 'CSE (AI & DS)'].includes(branch) && !!semester;
+
+        subjectCheckboxesContainer.innerHTML = '';
 
         if (hasSemesterSubjects) {
             try {
@@ -238,7 +249,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 populateSubjectCheckboxes(allSubjects);
             }
         } else {
-            populateSubjectCheckboxes(allSubjects);
+            if (branch && regulation && yearValue && semesterValue) {
+                populateSubjectCheckboxes(allSubjects);
+            } else {
+                subjectCheckboxesContainer.innerHTML = '<p>Select branch, regulation, year, and semester to load individual subjects.</p>';
+            }
         }
 
         const selectedMode = document.querySelector('input[name="subject-mode"]:checked').value;
@@ -443,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ 
                     filenames: papers.map(p => p.filename),
                     branch: branchFilterSelect.value,
-                    year: yearFilterSelect.value,
+                    year: getSelectedYearSemester(),
                     subjects: getSelectedSubjects()
                 })
             });
@@ -525,7 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({
                     filenames: papers.map(p => p.filename),
                     branch: branchFilterSelect.value,
-                    year: yearFilterSelect.value,
+                    year: getSelectedYearSemester(),
                     subjects: getSelectedSubjects()
                 })
             });
@@ -662,6 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
     branchFilterSelect.addEventListener('change', handleFilterCriteriaChange);
     regulationFilterSelect.addEventListener('change', handleFilterCriteriaChange);
     yearFilterSelect.addEventListener('change', handleFilterCriteriaChange);
+    semesterFilterSelect.addEventListener('change', handleFilterCriteriaChange);
     
     analyzeBtn.addEventListener('click', analyzeMultipleFiles);
     batchDownloadBtn.addEventListener('click', handleBatchDownload);
