@@ -144,7 +144,66 @@ aids_subjects = {
     ]
 }
 
+cse_subjects = {
+    "1-1": [
+        "Matrices and Calculus (M&C)",
+        "Engineering Chemistry (EC)",
+        "Programming for Problem Solving (PPS)",
+        "Basic Electrical Engineering (BEE)",
+        "Computer Aided Engineering Graphics (CAEG)"
+    ],
+    "1-2": [
+        "Ordinary Differential Equations & Vector Calculus (ODE&VC)",
+        "Applied Physics (AP)",
+        "Engineering Workshop (EW)",
+        "English for Skill Enhancement (ESE)",
+        "Electronic Devices and Circuits (EDC)"
+    ],
+    "2-1": [
+        "Digital Electronics (DE)",
+        "Data Structures (DS)",
+        "Computer Oriented Statistical Methods (COSM)",
+        "Computer Organization & Architecture (COA)",
+        "Object Oriented Programming through Java (OOPJ)"
+    ],
+    "2-2": [
+        "Discrete Mathematics (DM)",
+        "Business Economics & Financial Analysis (BEFA)",
+        "Operating Systems (OS)",
+        "Database Management Systems (DBMS)",
+        "Software Engineering (SE)"
+    ],
+    "3-1": [
+        "Design and Analysis of Algorithms (DAA)",
+        "Computer Networks (CN)",
+        "DevOps (DO)",
+        "EMBEDDED SYSTEMS (ES)",
+        "DATA ANALYTICS (DA)",
+        "Intellectual Property Rights (IPR)"
+    ],
+    "3-2": [
+        "Machine Learning (ML)",
+        "Formal Languages & Automata Theory (FLAT)",
+        "Artificial Intelligence (AI)",
+        "FUNDAMENTALS OF INTERNET OF THINGS (FIOT)",
+        "SOFTWARE TESTING METHODOLOGIES (STM)"
+    ],
+    "4-1": [
+        "Cryptography & Network Security (CNS)",
+        "Compiler Design (CD)",
+        "ELECTRONICS FOR HEALTH CARE (EHC)",
+        "CYBER SECURITY (CS)",
+        "BLOCKCHAIN TECHNOLOGY (BT)"
+    ],
+    "4-2": [
+        "Organizational Behavior (OB)",
+        "Professional Elective-VI (PE6)",
+        "Open Elective-III (OE3)"
+    ]
+}
+
 R22_SEMESTER_SUBJECTS = {
+    'CSE': cse_subjects,
     'CSE (AI & ML)': aiml_subjects,
     'CSE (AI & DS)': aids_subjects,
 }

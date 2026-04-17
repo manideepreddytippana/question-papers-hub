@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function updateSemestersAndSubjects() {
         const branch = branchSelect.value;
         const regulation = regulationSelect.value;
-        const hasSemesterSubjects = regulation === 'R22' && ['CSE (AI & ML)', 'CSE (AI & DS)'].includes(branch);
+        const hasSemesterSubjects = regulation === 'R22' && ['CSE', 'CSE (AI & ML)', 'CSE (AI & DS)'].includes(branch);
         
         semesterSelect.value = '';
         subjectSelect.value = '';
@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const branch = branchSelect.value;
         const regulation = regulationSelect.value;
         const semester = semesterSelect.value;
-        const hasSemesterSubjects = regulation === 'R22' && ['CSE (AI & ML)', 'CSE (AI & DS)'].includes(branch);
+        const hasSemesterSubjects = regulation === 'R22' && ['CSE', 'CSE (AI & ML)', 'CSE (AI & DS)'].includes(branch);
         
         if (hasSemesterSubjects && semester) {
             try {
@@ -263,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const semesterValue = semesterFilterSelect.value;
         const semester = (yearValue && semesterValue) ? `${yearValue}-${semesterValue}` : '';
         const isCriteriaComplete = areSubjectCriteriaComplete();
-        const hasSemesterSubjects = regulation === 'R22' && ['CSE (AI & ML)', 'CSE (AI & DS)'].includes(branch) && !!semester;
+        const hasSemesterSubjects = regulation === 'R22' && ['CSE', 'CSE (AI & ML)', 'CSE (AI & DS)'].includes(branch) && !!semester;
 
         subjectCheckboxesContainer.innerHTML = '';
 
