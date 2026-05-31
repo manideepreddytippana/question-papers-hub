@@ -1,6 +1,8 @@
-﻿flask
+flask
 PyPDF2
 requests
 python-dotenv
 aiohttp
 mysql-connector-python
+scikit-learn
+numpy

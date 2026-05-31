@@ -1,9 +1,0 @@
-# Environment variables
-.env
-
-# Python cache
-__pycache__/
-*.pyc
-
-# Uploads folder (optional, but good practice if you don't want to track uploads)
-uploads/
