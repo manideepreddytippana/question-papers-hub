@@ -6,3 +6,4 @@ aiohttp
 mysql-connector-python
 scikit-learn
 numpy
+gunicorn
